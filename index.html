@@ -127,6 +127,10 @@ function drawCls(d, k, i) {
   el.querySelectorAll('input[name=b' + i + ']').forEach(r => r.onchange = () => { k.backupId = r.value; });
 }
 
+function redrawKid(k) {  // draw a child's classes into the box that's on screen now (the page may have redrawn meanwhile)
+  const i = kids.indexOf(k), d = $('kids').children[i];
+  if (d) drawCls(d, k, i);
+}
 function draw() {
   const box = $('kids'); box.innerHTML = '';
   kids.forEach((k, i) => {
@@ -142,11 +146,11 @@ function draw() {
     });
     d.querySelector('input[data-f=birth]').onchange = e => {
       const v = e.target.value, y = +v.slice(0, 4);
-      k.classId = ''; k.backupId = ''; k.notice = ''; k.info = null;
+      k.classId = ''; k.backupId = ''; k.notice = ''; k.info = null; $('err').textContent = '';
       if (!v || y < 2010 || v > today) { k.birth = ''; drawCls(d, k, i); return; }  // ignore half-typed years
       k.birth = v; drawCls(d, k, i);
       api('getClasses', { birth: v, first: k.first, last: k.last, parent: $('parent').value })
-        .then(r => { if (k.birth === v) { k.info = r; drawCls(d, k, i); } })
+        .then(r => { if (k.birth === v) { k.info = r; redrawKid(k); } })
         .catch(() => { $('err').textContent = NET_ERR; });
     };
     drawCls(d, k, i);
@@ -198,18 +202,23 @@ function show(res) {
     h += '<div class="res"><b>' + esc(c) + ' is full.</b><br>' + (many ? 'Your kids are ' : 'Your child is ') + list(p) +
       ' on the waitlist. This is your current position, not a guaranteed spot. We will contact you if a spot opens.</div>';
   });
+  done = true; if (soonTimer) { clearInterval(soonTimer); soonTimer = null; } $('soon').innerHTML = '';
   $('formBox').classList.add('hide'); $('result').innerHTML = h; $('result').classList.remove('hide'); scrollTo(0, 0);
 }
 
 // 'Come back at...' banner while some levels haven't opened. Re-checks every 30 seconds and unlocks classes when they open.
-let lastSoon = null, soonTimer = null;
+let lastSoon = null, soonTimer = null, done = false;
 function showStatus(r) {
+  if (done) return;  // already registered: leave the thank-you screen alone
   let h = '';
   if (r.closed) h = '<div class="note"><b>Registration is closed.</b></div>';
   else if (r.upcoming && r.upcoming.length) {
     const same = r.upcoming.every(u => u.day === r.upcoming[0].day);
     const parts = r.upcoming.map(u => (same ? '' : u.day + ' at ') + u.time + ' for ' + list(u.names));
-    h = '<div class="note"><b>Registration is not open yet.</b> Please come back ' + (same ? r.upcoming[0].day + ' at ' : '') + parts.join(', and ') + '.</div>';
+    h = r.openNow && r.openNow.length
+      ? '<div class="note"><b>' + list(r.openNow) + ' registration is open now.</b> ' +
+        r.upcoming.map(u => list(u.names) + ' registration opens ' + u.day + ' at ' + u.time).join('. ') + '.</div>'
+      : '<div class="note"><b>Registration is not open yet.</b> Please come back ' + (same ? r.upcoming[0].day + ' at ' : '') + parts.join(', and ') + '.</div>';
   }
   $('soon').innerHTML = h;
   const key = JSON.stringify(r.upcoming || []);
