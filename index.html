@@ -101,13 +101,16 @@ function classHtml(k, i) {
     return '<div class="note"><b>' + list(lv) + ' registration is not open yet.</b> Please come back ' + cl[0].opens.replace(', ', ' at ') + '.</div>';
   }
   let h = (k.info.testMode ? '<div class="note"><b>TEST MODE:</b> open times are being ignored.</div>' : '') + (k.notice ? '<div class="note">' + esc(k.notice) + '</div>' : ''), last = '';
-  cl.forEach(c => {
+  cl.filter(c => c.open).forEach(c => {  // only show classes that are open; locked ones get a 'come back' line below
     if (c.level !== last) { h += '<p class="lv">' + c.level + '</p>'; last = c.level; }
     const tag = !c.open ? 'Opens ' + c.opens : c.needsApproval ? 'Request: needs coach approval' : c.full ? 'Full: join waitlist' : '';
     h += '<label class="opt' + (c.open ? '' : ' dis') + '"><input type="radio" name="c' + i + '" value="' + c.id + '"' +
       (k.classId === c.id ? ' checked' : '') + (c.open ? '' : ' disabled') + '> ' + c.day + 's, ' + c.time +
       (tag ? '<span class="tag">' + tag + '</span>' : '') + '</label>';
   });
+  const later = cl.filter(c => !c.open);
+  if (later.length) h += '<div class="note">' + list(later.map(c => c.level).filter((v, j, a) => a.indexOf(v) === j)) +
+    ' registration opens ' + later[0].opens.replace(', ', ' at ') + '. Please come back then for those classes.</div>';
   if (needsBackup(k)) {
     h += '<div class="note"><b>Intermediate needs coach approval.</b> Please also pick a backup Beginner II day. Your child keeps that spot unless Intermediate is approved.</div>' +
       '<p class="lv">Backup: Beginner II</p>';
