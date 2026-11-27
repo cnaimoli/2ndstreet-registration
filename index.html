@@ -103,7 +103,7 @@ function classHtml(k, i) {
   let h = (k.info.testMode ? '<div class="note"><b>TEST MODE:</b> open times are being ignored.</div>' : '') + (k.notice ? '<div class="note">' + esc(k.notice) + '</div>' : ''), last = '';
   cl.filter(c => c.open).forEach(c => {  // only show classes that are open; locked ones get a 'come back' line below
     if (c.level !== last) { h += '<p class="lv">' + c.level + '</p>'; last = c.level; }
-    const tag = !c.open ? 'Opens ' + c.opens : c.needsApproval ? 'Request: needs coach approval' : c.full ? 'Full: join waitlist' : '';
+    const tag = !c.open ? 'Opens ' + c.opens : c.needsApproval ? 'Request: needs coach approval' : c.full ? 'Full: you\'d be #' + c.nextWait + ' on the waitlist' : '';
     h += '<label class="opt' + (c.open ? '' : ' dis') + '"><input type="radio" name="c' + i + '" value="' + c.id + '"' +
       (k.classId === c.id ? ' checked' : '') + (c.open ? '' : ' disabled') + '> ' + c.day + 's, ' + c.time +
       (tag ? '<span class="tag">' + tag + '</span>' : '') + '</label>';
@@ -115,7 +115,7 @@ function classHtml(k, i) {
     h += '<div class="note"><b>Intermediate needs coach approval.</b> Please also pick a backup Beginner II day. Your child keeps that spot unless Intermediate is approved.</div>' +
       '<p class="lv">Backup: Beginner II</p>';
     cl.filter(c => c.id.indexOf('B2-') === 0).forEach(c => {
-      const tag = !c.open ? 'Opens ' + c.opens : c.full ? 'Full: join waitlist' : '';
+      const tag = !c.open ? 'Opens ' + c.opens : c.full ? 'Full: you\'d be #' + c.nextWait + ' on the waitlist' : '';
       h += '<label class="opt' + (c.open ? '' : ' dis') + '"><input type="radio" name="b' + i + '" value="' + c.id + '"' +
         (k.backupId === c.id ? ' checked' : '') + (c.open ? '' : ' disabled') + '> ' + c.day + 's, ' + c.time +
         (tag ? '<span class="tag">' + tag + '</span>' : '') + '</label>';
@@ -214,18 +214,13 @@ async function send() {
 
 function show(res, later) {
   let h = '<h1>Thank you!</h1><p class="sub">Here is what happened for each class.</p>';
-  const wl = {};
   res.forEach(r => {
     if (r.status === 'Registered') h += '<div class="res"><b>' + esc(r.name) + ' is registered</b> for ' + esc(r.cls) + '.' +
       (r.backup ? '<br>This is the backup day while Intermediate is reviewed.' : '') + '</div>';
     else if (r.status === 'Pending approval') h += '<div class="res"><b>' + esc(r.name) + ' has requested</b> ' + esc(r.cls) + '.' +
       '<br>Intermediate for 7-year-olds needs coach approval, so this is not a confirmed spot yet. We will contact you once it is reviewed. Until then, your backup Beginner II day stands.</div>';
-    else (wl[r.cls] = wl[r.cls] || []).push(r);
-  });
-  Object.keys(wl).forEach(c => {
-    const p = wl[c].map(r => ord(r.pos)), many = p.length > 1;
-    h += '<div class="res"><b>' + esc(c) + ' is full.</b><br>' + (many ? 'Your kids are ' : 'Your child is ') + list(p) +
-      ' on the waitlist. This is your current position, not a guaranteed spot. We will contact you if a spot opens.</div>';
+    else h += '<div class="res"><b>' + esc(r.name) + ' is #' + r.pos + ' on the waitlist</b> for ' + esc(r.cls) + ' (the class is full).' +
+      '<br>This is your current spot, not a guaranteed place. We will contact you if a spot opens.</div>';
   });
   (later || []).forEach(k => {
     h += '<div class="res"><b>' + esc(k.first || 'Your child') + ' is not registered yet.</b> ' + list(uniqLevels(k)) + ' registration opens ' +
