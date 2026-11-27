@@ -60,7 +60,7 @@ input[type=radio]{width:auto;margin:0}
 <label>Your name<input id="parent" autocomplete="name"></label>
 <label>Email<input id="email" type="email" autocomplete="email" placeholder="you@example.com"></label>
 <label>Instagram (optional)<input id="ig" placeholder="@yourname"></label>
-<label>Phone (optional)<input id="phone" type="tel" autocomplete="tel" inputmode="numeric" maxlength="12" placeholder="555-555-5555"></label>
+<label>Phone (optional)<input id="phone" type="tel" autocomplete="tel" inputmode="numeric" placeholder="555-555-5555"></label>
 </div></fieldset>
 
 <div id="kids"></div>
@@ -219,6 +219,8 @@ function show(res, later) {
       (r.backup ? '<br>This is the backup day while Intermediate is reviewed.' : '') + '</div>';
     else if (r.status === 'Pending approval') h += '<div class="res"><b>' + esc(r.name) + ' has requested</b> ' + esc(r.cls) + '.' +
       '<br>Intermediate for 7-year-olds needs coach approval, so this is not a confirmed spot yet. We will contact you once it is reviewed. Until then, your backup Beginner II day stands.</div>';
+    else if (r.status === 'Already registered') h += '<div class="res"><b>' + esc(r.name) + ' is already registered.</b> Nothing was changed for ' +
+      esc(r.name) + '. To switch classes, please DM us on Instagram.</div>';
     else h += '<div class="res"><b>' + esc(r.name) + ' is #' + r.pos + ' on the waitlist</b> for ' + esc(r.cls) + ' (the class is full).' +
       '<br>This is your current spot, not a guaranteed place. We will contact you if a spot opens.</div>';
   });
