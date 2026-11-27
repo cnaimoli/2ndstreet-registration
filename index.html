@@ -180,17 +180,22 @@ function refreshAll() {
   });
 }
 
+// A child whose classes aren't open yet is left out of this registration; the parent is told when to come back for them.
+const lockedOut = k => !!(k.info && k.info.classes && k.info.classes.length && !k.info.classes.some(c => c.open));
+const uniqLevels = k => k.info.classes.map(c => c.level).filter((v, j, a) => a.indexOf(v) === j);
 function send() {
   $('err').textContent = '';
+  const later = kids.filter(lockedOut), ready = kids.filter(k => !lockedOut(k));
+  if (!ready.length) { $('err').textContent = 'These classes are not open yet. Please come back at the time shown under each child.'; return; }
   $('go').disabled = true;
-  api('submit', { data: {parent: $('parent').value, email: $('email').value, ig: $('ig').value, phone: $('phone').value, children: kids.map(k => ({first:k.first, last:k.last, birth:k.birth, classId:k.classId, backupId:k.backupId}))} }).then(r => {
+  api('submit', { data: {parent: $('parent').value, email: $('email').value, ig: $('ig').value, phone: $('phone').value, children: ready.map(k => ({first:k.first, last:k.last, birth:k.birth, classId:k.classId, backupId:k.backupId}))} }).then(r => {
     $('go').disabled = false;
     if (r.error) $('err').textContent = r.error;
-    else show(r.results);
+    else show(r.results, later);
   }).catch(() => { $('go').disabled = false; $('err').textContent = 'Something went wrong. Please check your connection and try again.'; });
 }
 
-function show(res) {
+function show(res, later) {
   let h = '<h1>Thank you!</h1><p class="sub">Here is what happened for each class.</p>';
   const wl = {};
   res.forEach(r => {
@@ -204,6 +209,10 @@ function show(res) {
     const p = wl[c].map(r => ord(r.pos)), many = p.length > 1;
     h += '<div class="res"><b>' + esc(c) + ' is full.</b><br>' + (many ? 'Your kids are ' : 'Your child is ') + list(p) +
       ' on the waitlist. This is your current position, not a guaranteed spot. We will contact you if a spot opens.</div>';
+  });
+  (later || []).forEach(k => {
+    h += '<div class="res"><b>' + esc(k.first || 'Your child') + ' is not registered yet.</b> ' + list(uniqLevels(k)) + ' registration opens ' +
+      k.info.classes[0].opens.replace(', ', ' at ') + '. Please come back then to register ' + esc(k.first || 'them') + '.</div>';
   });
   done = true; if (soonTimer) { clearInterval(soonTimer); soonTimer = null; } $('soon').innerHTML = '';
   $('formBox').classList.add('hide'); $('result').innerHTML = h; $('result').classList.remove('hide'); scrollTo(0, 0);
