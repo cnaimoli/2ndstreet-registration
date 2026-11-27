@@ -41,6 +41,7 @@ input[type=radio]{width:auto;margin:0}
 .res{background:#fff;border:1px solid #dbe4ee;box-shadow:0 8px 28px rgba(27,42,65,.09);border-radius:16px;padding:18px;margin-bottom:12px}
 .hide{display:none}
 #go{width:100%;padding:15px}
+#soon .note{margin:0 0 18px;font-size:1.05rem}
 </style></head>
 <body><header class="top"><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <symbol id="tree" viewBox="-45 -150 90 150"><path d="M0-150L-22-95H22Z M0-120L-32-60H32Z M0-85L-42-22H42Z" fill="#5b8cc7"/><path d="M0-150L-9-134Q0-128 9-134Z M0-120L-12-100Q0-94 12-100Z M0-85L-15-66Q0-60 15-66Z" fill="#fff"/><rect x="-5" y="-22" width="10" height="22" fill="#4a6385"/></symbol>
@@ -52,7 +53,8 @@ input[type=radio]{width:auto;margin:0}
 <section class="hero"><h1>Winter 2027 class registration</h1><p>Eight weeks of classes, January 4 to February 27. Enter each child's birthdate to see the classes they can join, then pick one day per child.</p></section>
 <main>
 
-<div id="formBox">
+<div id="soon"></div>
+<div id="formBox" class="hide">
 <fieldset><legend>Parent info</legend>
 <div class="row">
 <label>Your name<input id="parent" autocomplete="name"></label>
@@ -94,6 +96,10 @@ function classHtml(k, i) {
   if (k.info.closed) return '<div class="note">Registration is closed.</div>';
   const cl = k.info.classes;
   if (!cl.length) return '<div class="note">No class fits this birthdate this season. Please DM us on Instagram.</div>';
+  if (!cl.some(c => c.open)) {  // none of this child's classes are open yet: tell them when to come back
+    const lv = cl.map(c => c.level).filter((v, j, a) => a.indexOf(v) === j);
+    return '<div class="note"><b>' + list(lv) + ' registration is not open yet.</b> Please come back ' + cl[0].opens.replace(', ', ' at ') + '.</div>';
+  }
   let h = (k.info.testMode ? '<div class="note"><b>TEST MODE:</b> open times are being ignored.</div>' : '') + (k.notice ? '<div class="note">' + esc(k.notice) + '</div>' : ''), last = '';
   cl.forEach(c => {
     if (c.level !== last) { h += '<p class="lv">' + c.level + '</p>'; last = c.level; }
@@ -150,7 +156,7 @@ function draw() {
 }
 
 // Child / parent names decide whether a 7-year-old is a returning Intermediate kid, so re-check when they change.
-const flags = k => k.info && k.info.classes ? k.info.classes.map(c => c.id + (c.needsApproval ? '*' : '')).join(',') : '';
+const flags = k => k.info && k.info.classes ? k.info.classes.map(c => c.id + (c.needsApproval ? '*' : '') + (c.open ? '' : '-')).join(',') : '';
 function refreshAll() {
   kids.forEach(k => {
     if (!k.birth) return;
@@ -194,7 +200,27 @@ function show(res) {
   });
   $('formBox').classList.add('hide'); $('result').innerHTML = h; $('result').classList.remove('hide'); scrollTo(0, 0);
 }
+
+// 'Come back at...' banner while some levels haven't opened. Re-checks every 30 seconds and unlocks classes when they open.
+let lastSoon = null, soonTimer = null;
+function showStatus(r) {
+  let h = '';
+  if (r.closed) h = '<div class="note"><b>Registration is closed.</b></div>';
+  else if (r.upcoming && r.upcoming.length) {
+    const same = r.upcoming.every(u => u.day === r.upcoming[0].day);
+    const parts = r.upcoming.map(u => (same ? '' : u.day + ' at ') + u.time + ' for ' + list(u.names));
+    h = '<div class="note"><b>Registration is not open yet.</b> Please come back ' + (same ? r.upcoming[0].day + ' at ' : '') + parts.join(', and ') + '.</div>';
+  }
+  $('soon').innerHTML = h;
+  const key = JSON.stringify(r.upcoming || []);
+  if (lastSoon !== null && key !== lastSoon) refreshAll();
+  lastSoon = key;
+  $('formBox').classList.toggle('hide', !!r.closed || r.anyOpen === false);  // no typing until something is open
+  if (!r.closed && !(r.upcoming && r.upcoming.length) && soonTimer) { clearInterval(soonTimer); soonTimer = null; }
+}
+function loadStatus() { api('status', {}).then(showStatus).catch(() => $('formBox').classList.remove('hide')); }  // if the check fails, show the form anyway (the server still enforces times)
 addKid();
+loadStatus(); soonTimer = setInterval(loadStatus, 30000);
 $('parent').onchange = refreshAll;
 $('phone').oninput = e => {  // auto-format as 555-555-5555, digits only, max 10
   let d = e.target.value.replace(/\D/g, '');
