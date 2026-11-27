@@ -180,11 +180,28 @@ function refreshAll() {
   });
 }
 
+function fetchInfo(k) {  // re-load one child's classes from Google
+  if (!k.birth) return Promise.resolve();
+  return api('getClasses', { birth: k.birth, first: k.first, last: k.last, parent: $('parent').value })
+    .then(r => { if (r && r.classes) k.info = r; }).catch(() => {});
+}
 // A child whose classes aren't open yet is left out of this registration; the parent is told when to come back for them.
 const lockedOut = k => !!(k.info && k.info.classes && k.info.classes.length && !k.info.classes.some(c => c.open));
 const uniqLevels = k => k.info.classes.map(c => c.level).filter((v, j, a) => a.indexOf(v) === j);
-function send() {
+async function send() {
   $('err').textContent = '';
+  if (kids.some(lockedOut)) {  // their classes may have opened since the page last checked: ask again before deciding
+    $('go').disabled = true;
+    const stale = kids.filter(lockedOut);
+    await Promise.all(stale.map(fetchInfo));
+    $('go').disabled = false;
+    const opened = stale.filter(k => !lockedOut(k));
+    if (opened.length) {
+      draw(); loadStatus();
+      $('err').textContent = 'Classes just opened for ' + list(opened.map(k => k.first || 'your child')) + '. Please pick a class, then press Register again.';
+      return;
+    }
+  }
   const later = kids.filter(lockedOut), ready = kids.filter(k => !lockedOut(k));
   if (!ready.length) { $('err').textContent = 'These classes are not open yet. Please come back at the time shown under each child.'; return; }
   $('go').disabled = true;
@@ -218,7 +235,7 @@ function show(res, later) {
   $('formBox').classList.add('hide'); $('result').innerHTML = h; $('result').classList.remove('hide'); scrollTo(0, 0);
 }
 
-// 'Come back at...' banner while some levels haven't opened. Re-checks every 30 seconds and unlocks classes when they open.
+// 'Come back at...' banner while some levels haven't opened. Re-checks every 15 seconds and unlocks classes when they open.
 let lastSoon = null, soonTimer = null, done = false;
 function showStatus(r) {
   if (done) return;  // already registered: leave the thank-you screen alone
@@ -241,7 +258,8 @@ function showStatus(r) {
 }
 function loadStatus() { api('status', {}).then(showStatus).catch(() => $('formBox').classList.remove('hide')); }  // if the check fails, show the form anyway (the server still enforces times)
 addKid();
-loadStatus(); soonTimer = setInterval(loadStatus, 30000);
+loadStatus(); soonTimer = setInterval(loadStatus, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !done) loadStatus(); });  // re-check right away when they come back to the page
 $('parent').onchange = refreshAll;
 $('phone').oninput = e => {  // auto-format as 555-555-5555, digits only, max 10
   let d = e.target.value.replace(/\D/g, '');
